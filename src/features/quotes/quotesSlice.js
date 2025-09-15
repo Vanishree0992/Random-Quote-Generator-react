@@ -1,34 +1,36 @@
+// src/features/quotes/quotesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
-// Async thunk for fetching quotes
+// Async thunk for fetching random quote
 export const fetchRandomQuote = createAsyncThunk(
   'quotes/fetchRandom',
   async (_, { rejectWithValue }) => {
     try {
-      // Using quotable API which is reliable and free
-      const response = await fetch('https://zenquotes.io/api/random')
-      
+      const response = await fetch('https://dummyjson.com/quotes')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      
+
       const data = await response.json()
-      
+      const quotes = data.quotes
+
+      if (!Array.isArray(quotes) || quotes.length === 0) {
+        throw new Error('No quotes found.')
+      }
+
+      const randomQuote = quotes[Math.floor(Math.random() * quotes.length)]
+
       return {
-        text: data.content,
-        author: data.author,
-        tags: data.tags || [],
-        id: data._id
+        text: randomQuote.quote,
+        author: randomQuote.author,
+        id: randomQuote.id
       }
     } catch (error) {
-      return rejectWithValue(
-        error.message || 'Failed to fetch quote. Please check your internet connection.'
-      )
+      return rejectWithValue(error.message || 'Failed to fetch quote.')
     }
   }
 )
 
-// Redux slice
 const quotesSlice = createSlice({
   name: 'quotes',
   initialState: {
@@ -41,30 +43,13 @@ const quotesSlice = createSlice({
   reducers: {
     addToFavorites: (state, action) => {
       const quote = action.payload
-      const existingQuote = state.favorites.find(fav => fav.id === quote.id)
-      
-      if (!existingQuote) {
+      if (!state.favorites.find(fav => fav.id === quote.id)) {
         state.favorites.push(quote)
-        // Save to localStorage (Note: In real Claude.ai artifacts, use React state instead)
         localStorage.setItem('favoriteQuotes', JSON.stringify(state.favorites))
       }
     },
-    
-    removeFromFavorites: (state, action) => {
-      const quoteId = action.payload.id
-      state.favorites = state.favorites.filter(fav => fav.id !== quoteId)
-      // Save to localStorage (Note: In real Claude.ai artifacts, use React state instead)
-      localStorage.setItem('favoriteQuotes', JSON.stringify(state.favorites))
-    },
-    
     clearError: (state) => {
       state.error = null
-    },
-    
-    addToHistory: (state, action) => {
-      const quote = action.payload
-      // Keep only last 10 quotes in history
-      state.quotesHistory = [quote, ...state.quotesHistory.slice(0, 9)]
     }
   },
   extraReducers: (builder) => {
@@ -76,8 +61,6 @@ const quotesSlice = createSlice({
       .addCase(fetchRandomQuote.fulfilled, (state, action) => {
         state.isLoading = false
         state.currentQuote = action.payload
-        state.error = null
-        // Add to history
         state.quotesHistory = [action.payload, ...state.quotesHistory.slice(0, 9)]
       })
       .addCase(fetchRandomQuote.rejected, (state, action) => {
@@ -87,11 +70,5 @@ const quotesSlice = createSlice({
   }
 })
 
-export const { 
-  addToFavorites, 
-  removeFromFavorites, 
-  clearError, 
-  addToHistory 
-} = quotesSlice.actions
-
+export const { addToFavorites, clearError } = quotesSlice.actions
 export default quotesSlice.reducer
